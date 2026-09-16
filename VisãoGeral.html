@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle — Pesos Abertos > 5 Dias</title>
+    <style>
+
+        h1 {
+             background-color: #1d4ed8;
+        
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { padding: 20px; max-width: 1200px; margin: 0 auto; background: #f5f7fa; }
+        h1 { color: #f8f8f9; margin-bottom: 20px; }
+        .upload-box { background: rgb(255, 255, 255); padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input[type="file"] { padding: 15px; margin: 15px 0;}
+        button { background: #1d4ed8; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 15px; }
+        button:hover { background: #3d69e2; }
+        .stats { display: flex; gap: 15px; margin: 15px 0; flex-wrap: wrap; }
+        .card { background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .card.red { border-left: 4px solid #ef4444; }
+        .card.yellow { border-left: 4px solid #f59e0b; }
+        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+        th { background: #1e40af; color: white; }
+        .alerta { background: #fd0000; color: #000000; font-weight: bold; }
+        .normal { background: #f8faf8; color: #000000; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<h1>🚛 Controle de Pesagem — Placas em Aberto</h1>
+
+<div class="upload-box">
+    <h3>📂 Carregar planilha atualizada (.csv)</h3>
+    <input type="file" id="arquivo" accept=".csv">
+    <button onclick="processar()">📊 Processar Dados</button>
+    <p style="margin-top:8px; color:#666;">Formato: separado por ponto e vírgula (;) — igual ao seu arquivo</p>
+</div>
+
+<div class="stats" id="estatisticas" class="hidden">
+    <div class="card">Total de registros: <strong id="total">0</strong></div>
+    <div class="card">Peso Aberto: <strong id="abertos">0</strong></div>
+    <div class="card red">⚠️ Mais de 5 dias: <strong id="atrasados">0</strong></div>
+</div>
+
+<table id="tabela" class="hidden">
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>Placa</th>
+            <th>Data 1ª Pesagem</th>
+            <th>Dias em Aberto</th>
+            <th>Observação</th>
+        </tr>
+    </thead>
+    <tbody id="corpo"></tbody>
+</table>
+
+<script>
+function processar() {
+    const input = document.getElementById('arquivo');
+    if (!input.files.length) return alert('Selecione um arquivo primeiro!');
+
+    const leitor = new FileReader();
+    leitor.onload = function(e) {
+        const texto = e.target.result;
+        const linhas = texto.split('\n').filter(l => l.trim());
+        const cabecalho = linhas[0].split(';');
+
+        // Índices das colunas conforme seu arquivo
+        const idx_STATUS = cabecalho.findIndex(c => c.includes('STATUS'));
+        const idx_PLACA = cabecalho.findIndex(c => c.includes('PLACA'));
+        const idx_DATA = cabecalho.findIndex(c => c.includes('DATA/HORA 1ª PESAGEM'));
+
+        let total = 0, abertos = 0, atrasados = 0;
+        const linhasTabela = [];
+
+        for (let i = 1; i < linhas.length; i++) {
+            const col = linhas[i].split(';');
+            const status = col[idx_STATUS]?.trim();
+            const placa = col[idx_PLACA]?.trim();
+            const dataStr = col[idx_DATA]?.trim();
+
+            if (!status || !placa) continue;
+            total++;
+
+            if (status !== 'PESO ABERTO') continue;
+            abertos++;
+
+            // Converter data DD/MM/AAAA HH:MM:SS → objeto Date
+            const [dataParte] = dataStr.split(' ');
+            const [dia, mes, ano] = dataParte.split('/');
+            const dataPesagem = new Date(ano, mes - 1, dia);
+            const hoje = new Date();
+            const dias = Math.floor((hoje - dataPesagem) / (1000 * 60 * 60 * 24));
+
+            let classe = '', texto = `${dias} dia(s)`;
+            if (dias > 5) { classe = 'alerta'; texto += ' ⚠️ ATRASADO'; atrasados++; }
+            else if (dias > 0) { classe = 'normal'; }
+
+            linhasTabela.push(`
+                <tr class="${classe}">
+                    <td>${status}</td>
+                    <td><strong>${placa}</strong></td>
+                    <td>${dataStr}</td>
+                    <td>${texto}</td>
+                    <td>${dias > 5 ? 'Verificar urgente!' : 'Dentro do prazo'}</td>
+                </tr>
+            `);
+        }
+
+        // Atualizar tela
+        document.getElementById('total').textContent = total;
+        document.getElementById('abertos').textContent = abertos;
+        document.getElementById('atrasados').textContent = atrasados;
+        document.getElementById('corpo').innerHTML = linhasTabela.join('');
+        document.getElementById('estatisticas').classList.remove('hidden');
+        document.getElementById('tabela').classList.remove('hidden');
+    };
+    leitor.readAsText(input.files[0], 'ISO-8859-1'); // codificação correta do seu arquivo
+}
+</script>
+</body>
+</html>
